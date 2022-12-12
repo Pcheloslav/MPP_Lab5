@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 
-namespace Core.cache
+namespace Core.Cache
 {
     internal class ExpressionCache : IExpressionCache
     {

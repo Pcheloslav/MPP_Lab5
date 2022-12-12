@@ -1,88 +1,118 @@
-﻿using Core.cache;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
+using Core.Cache;
 
 namespace Core
 {
     public class StringFormatter : IStringFormatter
     {
-        public static readonly StringFormatter Shared = new();
+        private static readonly StringFormatter s_singleton = new();
 
-        private IExpressionCache _cache = new ExpressionCache();
-        private const int _letters = 1, _ocb = 4, _ccb = 5, _dig = 2, _osb = 6, _csb = 7, _und = 3, _error = 0;
+        private const int _error = 0, _letters = 1, _dig = 2, _und = 3, _ocb = 4, _ccb = 5, _osb = 6, _csb = 7;
 
-        private int[,] MatrixTransitions =
+        private readonly IExpressionCache _cache = new ExpressionCache();
+        private readonly int[,] _transitions =
         {
-            {0 ,0, 0, 0, 0, 0, 0, 0},
-            {0 ,1, 1, 1, 2, 3, 1, 1},
-            {0, 4, 0, 0, 1, 0, 0, 0},
-            {0, 0, 0, 0, 0, 1, 0, 0},
-            {0, 4, 4, 4, 0, 1, 5, 0},
-            {0, 0, 6, 0, 0, 0, 0, 0},
-            {0, 0, 6, 0, 0, 0, 0, 7},
-            {0, 0, 0, 0, 0, 1, 0, 0},
+            { 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 1, 1, 1, 2, 3, 1, 1 },
+            { 0, 4, 0, 0, 1, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 1, 0, 0 },
+            { 0, 4, 4, 4, 0, 1, 5, 0 },
+            { 0, 0, 6, 0, 0, 0, 0, 0 },
+            { 0, 0, 6, 0, 0, 0, 0, 7 },
+            { 0, 0, 0, 0, 0, 1, 0, 0 }
         };
 
-        private int WhatSymbol(char c)
+        public static string Format(string template, object target)
         {
-            if (c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c == ' ')
-                return _letters;
-            else if (c >= '0' && c <= '9')
-                return _dig;
-            else if (c == '{')
-                return _ocb;
-            else if (c == '}')
-                return _ccb;
-            else if (c == '[')
-                return _osb;
-            else if (c == ']')
-                return _csb;
-            else if (c == '_')
-                return _und;
-            return _error;
+            return s_singleton.FormatString(template, target);
         }
 
-        public string Format(string template, object target)
+        private StringFormatter()
         {
-            int startPos = 0;
-            int condition = 1;
-            int prevCondition;
-            string res = "";
+        }
+
+        public string FormatString(string template, object target)
+        {
+            int currentState = 1, previousState, expressionStart = 0;
+            var builder = new StringBuilder(template.Length);
             for (int i = 0; i < template.Length; i++)
             {
-                prevCondition = condition;
-                condition = MatrixTransitions[condition, WhatSymbol(template[i])];
-
-                switch (condition)
+                if (Char.IsWhiteSpace(template[i]))
                 {
-                    case 0:
-                        throw new ArgumentException($"Invalid template, position {i}");
+                    builder.Append(template[i]);
+                    continue;
+                }
+
+                previousState = currentState;
+                currentState = _transitions[currentState, GetTransitionStep(template[i])];
+
+                switch (currentState)
+                {
                     case 1:
-                        if (prevCondition == 4 || prevCondition == 7)
+                        if (previousState == 4 || previousState == 7)
                         {
-                            res += _cache.Evaluate(target, template[startPos..i]); 
+                            // Completed collecting the property/field (4) or indexed property/field (7)
+                            builder.Append(_cache.Evaluate(target, template[expressionStart..i])); 
                         }
                         else
                         {
-                            res += template[i];
+                            builder.Append(template[i]);
                         }
                         break;
                     case 4:
-                        if (prevCondition == 2)
+                        if (previousState == 2)
                         {
-                            startPos = i;
+                            // Start collecting property/field or indexed property/field
+                            expressionStart = i;
                         }
                         break;
+                    case 0:
+                        {
+                            throw new ArgumentException($"Invalid template character '{template[i]}' at position {i}");
+                        }
                 }
             }
-            if (condition==1)
-                return res;
+            if (currentState == 1)
+            {
+                return builder.ToString();
+            }
             else
-                throw new ArgumentException($"Invalid template, position {template.Length - 1}");
+            {
+                throw new ArgumentException($"Invalid template at position {template.Length - 1}");
+            }
         }
-      
+
+        private static int GetTransitionStep(char c)
+        {
+            if (c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z')
+            {
+                return _letters;
+            }
+            else if (c >= '0' && c <= '9')
+            {
+                return _dig;
+            }
+            else if (c == '{')
+            {
+                return _ocb;
+            }
+            else if (c == '}')
+            {
+                return _ccb;
+            }
+            else if (c == '[')
+            {
+                return _osb;
+            }
+            else if (c == ']')
+            {
+                return _csb;
+            }
+            else if (c == '_')
+            {
+                return _und;
+            }
+            return _error;
+        }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace Core.cache
+﻿namespace Core.Cache
 {
     internal interface IExpressionCache
     {

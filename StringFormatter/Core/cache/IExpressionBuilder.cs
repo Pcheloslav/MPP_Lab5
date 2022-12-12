@@ -1,6 +1,6 @@
 ﻿using System.Linq.Expressions;
 
-namespace Core.cache
+namespace Core.Cache
 {
     internal interface IExpressionBuilder
     {
